@@ -7,11 +7,7 @@
 #include <arpa/inet.h>
 
 #define MY_PORT 8080
-//#define IPv4_LOCAL_HOST "169.254.52.43"
-//#define IPv4_LOCAL_HOST "100.68.38.54"
-#define IPv4_LOCAL_HOST "100.68.252.118"
-//#define IPv4_LOCAL_HOST "162.158.62.6"
-//#define IPv4_LOCAL_HOST "127.0.0.1"               // Сетевой адрес самой машины
+#define IPv4_LOCAL_HOST "127.0.0.1"               // Сетевой адрес самой машины
 int main()
 {
     //int clientFD {};v4

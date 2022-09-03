@@ -1,91 +1,128 @@
 #include <iostream>
-#include <sys/socket.h>         // For: struct sockaddr
+#include <sys/socket.h>         // For: struct sockaddr, socket()
 #include <netinet/in.h>         // For: htons()
 #include <cstdio>               // For: perror()
 #include <cstring>              // For: strlen()
 #include <unistd.h>             // For: close()
-#define MY_PORT     8080
+
+
+
+#define PORT_NUMBER     8080        // portNum > 1024 && portNum <= 65535
 
 enum ReturnCode {
     NO_ERROR,
     BAD_SOCKET,
+    BAD_SETSOCKOPT,
+    BAD_BIND,
+    BAD_LISTEN,
+    BAD_ACCEPT,
 
     MAX_RETURN_CODE
 };
 
 int main()
 {
-    //int portNum {MY_PORT};              // Какой-то порт (главное, portNum > 1024 && portNum <= 65535)
-    int socketMaxQueue {3};             // Максимальная длина очереди из желающих присоединиться к сокету
-    int newSocketFD {};                 // Дескриптор сокета для очередного клиента
+    //int newSocketFD {};                 // Дескриптор сокета для очередного клиента
     char buffer[1024] = {'\0'};
 
     const char* helloString = "Hello from SERVER";
+    int retValue {0};
 
 
     int valRead {0};
     int valSend {0};
 
 
-    struct sockaddr_in serverAddress;   // Структура, описывающая сокет (IP:порт). Стоит отметить, что для IPv6 используется
-                                        // аналогичная структура "sockaddr_in6", а "sockaddr" - базовая часть всех этих структур.
+
+
+
+    // #### int socket(int DOMAIN, int TYPE, int PROTOCOL);
+    // ####
+    // #### Функция создаёт сокет (оконечную точку для коммуникации). В случае успеха возвращает
+    // ####         дескриптор, по которому можно обращаться к сокету.
+    // ####
+    // ####   DOMAIN   - коммуникационный домен, описывающий форматы адресов и правила их интерпретации
+    // ####              (AF_INET - адрес состоит из имени хоста и номера порта; AF_UNIX - адресс это допустимое имя файла).
+    // ####   TYPE     - тип соединения (SOCK_STREAM - создание виртуального канала для потоковой передачи байтов;
+    // ####              SOCK_DGRAM - передача датаграмм, отдельных пакетов с данными, т.е. порциями).
+    // ####   PROTOCOL - тип протокола (TCP, UDP и т.д.)
+    // ####
+    int serverSocket {socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)};
+    if (serverSocket < 0) {
+        std::perror("\n[ERROR]::[socket]");
+        return BAD_SOCKET;
+    }
+    else {
+        std::cout << "\n[MESSAGE]::[socket]: server socket has been created." << std::endl;
+    }
+
+
+    // #### int setsockopt(int SOCKET, int LEVEL, int FLAG, const void *BUFFER, socklen_t BUFFER_LENGTH);
+    // ####
+    // #### Функция устанавливает флаги (опции) сокета.
+    // ####
+    // ####   LEVEL   - Определяет уровень, на котором будет работать флаг
+    // ####             (SOL_SOCKET - непосредственно уровень сокета).
+    // ####   FLAG    - непосредственно флаг(и) для установки
+    // ####
+    // ####   BUFFER  - буффер для хранения флагов (ниже используется просто целое число)
+    // ####
+    int socketOption {1};
+    retValue = setsockopt(serverFD, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &socketOption, sizeof(socketOption));
+    if (retValue != 0) {
+        std::perror("[ERROR]::[setsockopt]");
+        return BAD_SETSOCKOPT;
+    }
+    else {} // Nothing to do
+
+
+    // #### Итак, сокет для сервера создали. Теперь нужно присвоить ему адрес, по которому с этим сокетом смогут
+    // #### связываться другие процессы.
+    // #### Инициализируем структуру, которая будет содержать адрес нашего серверного сокета:
+    // ####
+    struct sockaddr_in serverAddress =
+    {
+        .sin_family      = AF_INET,             // Коммуникационный домен AF_INET (адрес = имя хоста + номер порта)
+        .sin_port        = htons(PORT_NUMBER)   // Номер порта (переведённый в сетевой порядок следования байтов)
+        .sin_addr.s_addr = INADDR_ANY,          // Присваиваем IP-адрес (INADDR_ANY - хотим работать со всеми IP-адресами машины).
+                                                // Как я понимаю, есть разные адреса (для WiFi, для подключения через Ethernet,
+                                                //   для локального адреса, для широковещательного адрес и т.п.)
+    };
     int addrLen {sizeof(serverAddress)};
 
 
-    // Создаём новый сокет в домене AF_INET (что означает соединение по IPv4);
-    // Тип сокета SOCK_STREAM (означает, что это TCP-сокет);
-    // Значение IP (0 - айпишник выбирается автоматически).
-    // Сама функция возращает дескриптор сокета
-
-    // #### Сперва создаём новый TCP-сокет (SOCK_STREAM) в домене AF_INET, что означает
-    // #### соединение по
+    // #### Связываем наш сокет с адресом
     // ####
-    int serverFD {socket(AF_INET, SOCK_STREAM, 0)};
-    if (serverFD < 0) {
-        std::perror("\n[ERROR]::[socket]");
-        exit(EXIT_FAILURE);
-    }
-    else {
-        std::cout << "\nServer socket has been created." << std::endl;
-    }
-
-    // Функция для манипуляции флагами сокета [serverFD]; SOL_SOCKET - означает манипуляции
-    // флагами на уровне сокета. Далее указанные флаги закидываем в [socketOption]
-    int socketOption {1};
-    if (0 != setsockopt(serverFD, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &socketOption, sizeof(socketOption))) {
-        std::perror("[ERROR]::[setsockopt]");
-        exit(EXIT_FAILURE);
-    }
-    else {} // Nothing to do
-
-
-
-    serverAddress.sin_family = AF_INET;                     // Семья адресов IPv4
-    serverAddress.sin_addr.s_addr = INADDR_ANY;             // Привязываем сокет к адресу для приема ВСЕХ входящих сообщений
-    serverAddress.sin_port = htons(MY_PORT);                // Номер порта
-
-    // Присоединяем сокет к нашему порту
-    if ((bind(serverFD, (struct sockaddr*)(&serverAddress), sizeof(serverAddress))) < 0) {
+    retValue = bind(serverSocket, (struct sockaddr*)(&serverAddress), sizeof(serverAddress));
+    if (retValue < 0) {
         std::perror("[ERROR]::[bind]");
-        exit(EXIT_FAILURE);
+        return ReturnCode::BAD_BIND;
     }
     else {} // Nothing to do
 
-    // Устанавливаем сокет в пассивное состояние, в котором он будет "слушать"
-    // входящие соединения, использующие ф-цию accept().
-    if (listen(serverFD, socketMaxQueue) < 0) {
+
+    // #### Устанавливаем сокет в пассивное состояние, в котором он будет "слушать"
+    // #### входящие соединения, использующие ф-цию accept().
+    // #### [socketMaxQueue] - максимальная длина очереди из желающих присоединиться к сокету.
+    // ####
+    int socketMaxQueue {3};
+    retValue = listen(serverSocket, socketMaxQueue);
+    if (retValue < 0) {
         std::perror("[ERROR]::[listen]");
-        exit(EXIT_FAILURE);
+        return ReturnCode::BAD_LISTEN;
     }
     else {} // Nothing to do
 
-    // Принимаем первый запрос из очереди на соединение с [serverFD]
-    newSocketFD = accept(serverFD, (struct sockaddr*)(&serverAddress), (socklen_t*)(&addrLen));
-    if (newSocketFD < 0) {
+
+
+    // #### Принимаем первый запрос из очереди на соединение с серверным сокетом
+    // ####
+    int clientSocket {accept(serverSocket, (struct sockaddr*)(&serverAddress), (socklen_t*)(&addrLen))};
+    if (clientSocket < 0) {
         std::perror("[ERROR]::[accept]");
-        exit (EXIT_FAILURE);
+        return ReturnCode::BAD_ACCEPT;
     }
-    else {} // Nothing to do;
+    else {} // Nothing to do
 
     // Read the input data from newSocket
     valRead = read(newSocketFD, buffer, 1024);
