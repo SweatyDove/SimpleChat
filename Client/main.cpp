@@ -1,32 +1,11 @@
-#include <iostream>
-#include <sys/socket.h>         // For: struct sockaddr
-//#include <netinet/in.h>       // For: htons()
-#include <cstdio>               // For: perror()
-#include <cstring>              // For: strlen()
-#include <unistd.h>             // For: close()
-#include <arpa/inet.h>
+#include "header.h"
 
-#define PORT_NUMBER 8080
-#define TARGET_IP "127.0.0.1"               // Сетевой адрес самой машины
-
-enum RetCode {
-    NO_ERROR,
-    BAD_SOCKET,
-    BAD_SETSOCKOPT,
-    BAD_INET_PTON,
-    BAD_CONNECT,
-    BAD_BIND,
-    BAD_LISTEN,
-    BAD_ACCEPT,
-
-    MAX_RETURN_RetCode
-};
+#define     END_OF_TRANSMISSION     "[CLIENT HAS STOPPED TRANSMISSION]"
 
 int main()
 {
     int retValue {0};
-    char buffer[1024] = {'\0'};
-    const char* strFromClient = "Hello from CLIENT!";
+
 
 
     // #### int socket(int DOMAIN, int TYPE, int PROTOCOL);
@@ -86,30 +65,59 @@ int main()
     // #### Отправляем сообщение через клиентский сокет. Последний аргумент функции равен
     // #### нулю, что означает запись в сокет в порядке поступления байтов.
     // ####
-    retValue = send(clientSocket, strFromClient, strlen(strFromClient), 0);
-    if (retValue < 0) {
-        std::perror("[WARNING]::[send]");
-    }
-    else {
-        std::cout << "\nNext message send to server: ";
-        for (int ii {0}; ii < retValue; ++ii) {
-            std::cout.put(strFromClient[ii]);
-        }
-        std::cout << std::endl;
-    }
+    std::string message {};
+    std::cout << "\nEnter your message. (Press 'ENTER' to send message; 'ESC' - to exit)." << std::endl;
 
-    // Считываем сообщение от сервера
-    retValue = read(clientSocket, buffer, 1024);
-    if (retValue != -1) {
-        std::cout << "\nGot server response: ";
-        std::cout.write(buffer, retValue);
-        std::cout << std::endl;
+    linuxTerminalMode(!CANONICAL);
+    while(true) {
+        std::cout << ">" << std::flush;
+        if (0 == getString(message)) {
+            retValue = send(clientSocket, message.c_str(), message.size(), 0);
+            if (retValue < 0) {
+                std::perror("[WARNING]::[send]");
+            }
+            else {} // Nothing to do
+            message.clear();
+        }
+        else {
+            retValue = send(clientSocket, END_OF_TRANSMISSION, sizeof(END_OF_TRANSMISSION), 0);
+            break;
+        }
     }
-    else {
-        std::perror("[WARNING]::[read]");
-    }
+    linuxTerminalMode(CANONICAL);
+
+
 
     close(conn);
     shutdown(clientSocket, SHUT_RDWR);
     return 0;
 }
+
+
+
+
+// #### Отправляем сообщение через клиентский сокет. Последний аргумент функции равен
+// #### нулю, что означает запись в сокет в порядке поступления байтов.
+// ####
+//    retValue = send(clientSocket, strFromClient, strlen(strFromClient), 0);
+//    if (retValue < 0) {
+//        std::perror("[WARNING]::[send]");
+//    }
+//    else {
+//        std::cout << "\nNext message send to server: ";
+//        for (int ii {0}; ii < retValue; ++ii) {
+//            std::cout.put(strFromClient[ii]);
+//        }
+//        std::cout << std::endl;
+//    }
+
+//    // Считываем сообщение от сервера
+//    retValue = read(clientSocket, buffer, 1024);
+//    if (retValue != -1) {
+//        std::cout << "\nGot server response: ";
+//        std::cout.write(buffer, retValue);
+//        std::cout << std::endl;
+//    }
+//    else {
+//        std::perror("[WARNING]::[read]");
+//    }

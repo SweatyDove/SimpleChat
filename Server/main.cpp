@@ -1,9 +1,26 @@
+
+
+// Comments:
+//
+// #1 Добавить несколько потоков-клиентов, чтобы можно было получать сообщения сразу от нескольких чловек
+
+
+
+
+
+
 #include <iostream>
 #include <sys/socket.h>         // For: struct sockaddr, socket()
 #include <netinet/in.h>         // For: htons()
 #include <cstdio>               // For: perror()
 #include <cstring>              // For: strlen()
 #include <unistd.h>             // For: close()
+
+#include <thread>
+#include <atomic>
+
+
+#define     macroPaste(front, back)     front ## _ ## back
 
 
 
@@ -20,12 +37,14 @@ enum Code {
     MAX_RETURN_CODE
 };
 
+std::atomic<bool>   terminalIsFree {true};
+
 int main()
 {
-    char buffer[1024] = {'\0'};
 
-    const char* helloString = "Hello from SERVER";
+    //const char* helloString = "Hello from SERVER";
     int retValue {0};
+
 
 
     // #### int socket(int DOMAIN, int TYPE, int PROTOCOL);
@@ -80,12 +99,12 @@ int main()
     serverSocketAddress.sin_addr.s_addr = INADDR_ANY;             // Присваиваем IP-адрес (INADDR_ANY - хотим работать со всеми IP-адресами машины).
                                                                     // Как я понимаю, есть разные адреса (для WiFi, для подключения через Ethernet,
                                                                     //   для локального адреса, для широковещательного адрес и т.п.)
-    int servEndPointAddrLen {sizeof(serverSocketAddress)};
+    int serverSocketAddressLen {sizeof(serverSocketAddress)};
 
 
     // #### Связываем наш сокет с адресом
     // ####
-    retValue = bind(serverSocketPart, (struct sockaddr*)(&serverSocketAddress), servEndPointAddrLen);
+    retValue = bind(serverSocketPart, (struct sockaddr*)(&serverSocketAddress), serverSocketAddressLen);
     if (retValue < 0) {
         std::perror("[ERROR]::[bind]");
         return Code::BAD_BIND;
@@ -97,7 +116,7 @@ int main()
     // #### входящие соединения, использующие ф-цию accept().
     // #### [socketMaxQueue] - максимальная длина очереди из желающих присоединиться к сокету.
     // ####
-    int socketMaxQueue {3};
+    int socketMaxQueue {1};
     retValue = listen(serverSocketPart, socketMaxQueue);
     if (retValue < 0) {
         std::perror("[ERROR]::[listen]");
@@ -106,31 +125,77 @@ int main()
     else {} // Nothing to do
 
 
-
     // #### Принимаем первый запрос из очереди желающих присоединиться к серверному сокету.
     // #### Формируем полноценный сокет (пару клиент-сервер).
     // ####
-    int socket_1 {accept(serverSocketPart, (struct sockaddr*)(&serverSocketAddress), (socklen_t*)(&servEndPointAddrLen))};
+    int socket_1 {accept(serverSocketPart, (struct sockaddr*)(&serverSocketAddress), (socklen_t*)(&serverSocketAddressLen))};
     if (socket_1 < 0) {
         std::perror("[ERROR]::[accept]");
         return Code::BAD_ACCEPT;
     }
-    else {} // Nothing to do
+    else {
+        int attempt {0};
+        const int maxAttempt {10};
+        const int bufSize {1024};
+        char buffer[bufSize] = {'\0'};
+
+        while (attempt < maxAttempt) {
+            retValue = read(socket_1, buffer, 1024);
+            // Если есть сообщение - выводим
+            if (retValue > 0) {
+                std::cout << "CLIENT_1: ";
+                std::cout.write(buffer, retValue);
+                std::cout << "\n";
+                attempt = 0;
+            }
+            else if (retValue == 0) {
+                // Если нет - увеличиваем счётчик попыток
+                attempt++;
+            }
+            else {
+                std::perror("[WARNING]::[read]");
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+    }
+
+    // #### Закрываем соединение с клиентом
+    close(socket_1);
+
+    // #### Отключаем как чтение, так и запись связанную с socketServer
+    shutdown(serverSocketPart, SHUT_RDWR);
+    return 0;
+
+}
+
+
+
+
+    // #### Принимаем первый запрос из очереди желающих присоединиться к серверному сокету.
+    // #### Формируем полноценный сокет (пару клиент-сервер).
+    // ####
+//    int socket_1 {accept(serverSocketPart, (struct sockaddr*)(&serverSocketAddress), (socklen_t*)(&serverSocketAddressLen))};
+//    if (socket_1 < 0) {
+//        std::perror("[ERROR]::[accept]");
+//        return Code::BAD_ACCEPT;
+//    }
+//    else {} // Nothing to do
 
     // #### Считываем данные, приходящие через сокет [socketClientServer]
     // ####
-    retValue = read(socket_1, buffer, 1024);
-    if (retValue != -1) {
-        std::cout << "Data, recived from client_1: ";
-        std::cout.write(buffer, retValue);
+//    retValue = read(socket_1, buffer, 1024);
+//    if (retValue != -1) {
+//        std::cout << "Data, recived from client_1: ";
+//        std::cout.write(buffer, retValue);
 
-    }
-    else {
-        std::perror("[WARNING]::[read]");
-    }
+//    }
+//    else {
+//        std::perror("[WARNING]::[read]");
+//    }
 
     // #### Отправляем данные через сокет @socketClientServer клиенту
     // ####
+    /*
     retValue = send(socket_1, helloString, strlen(helloString), 0);
     if (retValue != -1) {
         std::cout << "\nServer send message to client_1: ";
@@ -142,15 +207,59 @@ int main()
     else {
         std::perror("[WARNING]::[send]");
     }
+    */
 
-    // #### Закрываем соединение с клиентом
-    close(socket_1);
+//    // #### Закрываем соединение с клиентом
+//    close(socket_1);
 
-    // #### Отключаем как чтение, так и запись связанную с socketServer
-    shutdown(serverSocketPart, SHUT_RDWR);
-    return 0;
+//    // #### Отключаем как чтение, так и запись связанную с socketServer
+//    shutdown(serverSocketPart, SHUT_RDWR);
+//    return 0;
 
-}
+
+
+
+
+
+//int tmp;
+
+//int number {0};
+//while (number < socketMaxQueue) {
+//    tmp = accept(serverSocketPart, (struct sockaddr*)(&serverSocketAddress), (socklen_t*)(&serverSocketAddressLen));
+//    if (tmp < 0) {
+//        std::perror("[ERROR]::[accept]");
+//        return Code::BAD_ACCEPT;
+//    }
+//    else if (number == 0) {
+//        std::thread thread_0 (foo, tmp, number);
+//        ++number;
+//    }
+//    else if (number == 1) {
+//        std::thread thread_1 (foo, tmp, number);
+//        ++number;
+//    }
+//    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+//}
+
+//void foo(int socket, int num)
+//{
+//    int socket {tmp};
+//    int retValue {};
+//    const int bufSize {1024};
+//    char buffer[bufSize] = {'\0'};
+
+//    while (terminalIsFree) {
+//        retValue = read(socket, buffer, bufSize);
+//        if (retValue != -1) {
+//            std::cout << "CLIENT_1:\n";
+//            std::cout.write(buffer, retValue);
+//        }
+//        else {
+//            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+//        }
+//    }
+
+//});
 
 
 
