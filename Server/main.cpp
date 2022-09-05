@@ -22,6 +22,12 @@
 
 #define     macroPaste(front, back)     front ## _ ## back
 
+int receiveImage(std::FILE*, int socket);
+
+const int bufSize {16384};
+char buffer[bufSize];             // Temporary make it global 'cause I don't know the size of input image
+
+#define     FILE_NAME               "/home/alexey/Desktop/new_image.jpeg"
 
 
 #define PORT_NUMBER     8080        // portNum > 1024 && portNum <= 65535
@@ -37,6 +43,13 @@ enum Code {
     MAX_RETURN_CODE
 };
 
+enum Dataype {
+    MESSAGE = 1,
+    IMAGE,
+
+    MAX_MESSAGE_TYPE
+};
+
 std::atomic<bool>   terminalIsFree {true};
 
 int main()
@@ -44,6 +57,7 @@ int main()
 
     //const char* helloString = "Hello from SERVER";
     int retValue {0};
+    std::FILE* image {nullptr};
 
 
 
@@ -133,14 +147,34 @@ int main()
         std::perror("[ERROR]::[accept]");
         return Code::BAD_ACCEPT;
     }
+    int dataType {0};
+    retValue = read(socket_1, &dataType, sizeof(int));
+    if (retValue < 0) {
+         std::perror("[WARNING]::[read]");
+    }
+    else {
+        switch (dataType) {
+        case MESSAGE:
+            // ReciveMessage
+            break;
+        // Случай приема файла/изображения
+        case IMAGE:
+            receiveImage(image, socket_1);
+            break;
+        default:
+            std::cout << "\n[WARNING]: incorrect type of input data" << std::endl;
+        }
+    }
+    // Случай приёма сообщений
+    /*
     else {
         int attempt {0};
         const int maxAttempt {10};
-        const int bufSize {1024};
+        const int bufSize {2048};
         char buffer[bufSize] = {'\0'};
 
         while (attempt < maxAttempt) {
-            retValue = read(socket_1, buffer, 1024);
+            retValue = read(socket_1, buffer, bufSize);
             // Если есть сообщение - выводим
             if (retValue > 0) {
                 std::cout << "CLIENT_1: ";
@@ -158,12 +192,87 @@ int main()
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
     }
+    */
 
     // #### Закрываем соединение с клиентом
     close(socket_1);
 
     // #### Отключаем как чтение, так и запись связанную с socketServer
     shutdown(serverSocketPart, SHUT_RDWR);
+    return 0;
+
+}
+
+
+int receiveImage(std::FILE* image, int socket)
+{
+    long imageSize {};
+    long retValue {0};
+    int receiveSize {0};
+
+    // #### Get the size of image
+    do {
+        retValue = read(socket, &imageSize, sizeof(long));
+    } while (retValue < 0);
+
+    image = std::fopen(FILE_NAME, "wr");
+    if (image == nullptr) {
+        std::perror("[ERROR]::[fopen]");
+        return -1;
+    }
+    else {
+        // #### Send the verification signal, that we are ready to accept the image
+    }
+
+
+    // ####
+
+    struct timeval timeValue = {10, 0};
+    fd_set fileDescriptorSet;
+
+    while(receiveSize < imageSize) {
+
+        // #1 Clear a new set of descriptors (which are living in the [fileDescriptorSet])
+        FD_ZERO(&fileDescriptorSet);
+
+        // #2 Add our socket descriptor into the specified set: [fileDescriptorSet]
+        FD_SET(socket, &fileDescriptorSet);
+
+        // #3 Wait for status changes of elements in [fileDescriptorSet].
+        // ## [timeValue] is a time before get answer.
+        retValue = select(FD_SETSIZE, &fileDescriptorSet, NULL, NULL, &timeValue);
+        if (retValue < 0) {
+            std::perror("[ERROR]::[select]");
+            return -1;
+        }
+        else if (retValue == 0) {
+            std::cout << "\n[ERROR]::[select]: buffer read timeout has expired.";
+            return -1;
+        }
+        else {
+            retValue = read(socket, buffer, bufSize);
+            if (retValue < 0) {
+                std::perror("[ERROR]::[select]");
+                return -1;
+            }
+            else {
+                // Пишем в файл изображения данные из буфера
+                std::fwrite(buffer, 1, retValue, image);
+                receiveSize += retValue;
+            }
+        }
+    }
+
+    std::cout << "Get image size:      " << imageSize << " bytes."
+              << "Received image size: " << receiveSize << " bytes."
+              << std::endl;
+
+    std::fclose(image);
+    std::string displayCommand {"\n eog "};
+    std::string fileName {FILE_NAME};
+    std::string commandLine = displayCommand + fileName;
+    std::system(commandLine.c_str());
+
     return 0;
 
 }

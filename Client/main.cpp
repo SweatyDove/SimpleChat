@@ -4,6 +4,13 @@
 #define     FILE_NAME               "/home/alexey/Desktop/image.jpeg"
 int sendFile(const char* fileName, int socket);
 
+enum DataType {
+    MESSAGE = 1,
+    IMAGE,
+
+    MAX_MESSAGE_TYPE
+};
+
 
 int main()
 {
@@ -71,6 +78,7 @@ int main()
     bool taskLoop {true};
     char ch {'\0'};
     std::string message {};
+    int dataType {0};
 
     while (taskLoop) {
         std::cout << "\nWhat are you going to do? (Press an appropriate button)."
@@ -83,6 +91,13 @@ int main()
 
         switch(ch) {
         case '1':
+            dataType = MESSAGE;
+            retValue = send(clientSocket, (void*) &dataType, sizeof(int), 0);
+            if (retValue < 0) {
+                 std::perror("[WARNING]::[read]");
+            }
+            else {} // Nothing to do
+
             std::cout << "\nEnter your message. (Press 'ENTER' to send message; 'ESC' - to exit)." << std::endl;
 
             linuxTerminalMode(!CANONICAL);
@@ -103,6 +118,13 @@ int main()
             linuxTerminalMode(CANONICAL);
             break;
         case '2':
+            dataType = IMAGE;
+            retValue = send(clientSocket, (void*) &dataType, sizeof(int), 0);
+            if (retValue < 0) {
+                 std::perror("[WARNING]::[read]");
+            }
+            else {} // Nothing to do
+
             if (0 == sendFile(FILE_NAME, clientSocket)) {
                 std::cout << "\nFile " << FILE_NAME << " has been successfully sent!" << std::endl;
             }
@@ -112,6 +134,7 @@ int main()
             break;
         case 27:
             retValue = send(clientSocket, END_OF_TRANSMISSION, sizeof(END_OF_TRANSMISSION), 0);
+            std::cout << "\b\b  \b\b" << std::flush;
             taskLoop = false;
             break;
         default:
