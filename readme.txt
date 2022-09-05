@@ -1,3 +1,3 @@
 Simple client-server application with the opportunity to transfer data (files and messages).
 
-Spend: 14.5h
+Spend: 17.5h

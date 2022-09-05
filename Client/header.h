@@ -19,6 +19,8 @@
 
 #define     CANONICAL   true
 #define     ESC         027
+#define     MOVE_CURSOR_ONE_LINE_UP     "\033[F"
+#define     NEW_LINE                    "\n"
 
 
 #define     LINUX_CRLF(c)   (c == '\n')
