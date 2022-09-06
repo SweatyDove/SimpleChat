@@ -24,18 +24,20 @@
 #define     NEW_LINE                    "\n"
 
 
-#define     LINUX_CRLF(c)   (c == '\n')
-#define     WINDOWS_CRLF(c)
+#define     END_OF_MESSAGE          "END_OF_MESSAGE"
+#define     END_OF_IMAGE            "END_OF_IMAGE"
+#define     END_OF_TRANSMISSION     "END_OF_TRANSMISSION"
+
+#define     mcrIsDigit(ch)          (ch >= '0' && ch <= '9')
 
 
 void    linuxTerminalMode(bool mode);
 int     linux_kbhit(void);
 
-void clearWorkScreen(int lines, int columns);
-void moveCursor(int relative_line, unsigned int column);
+//void clearWorkScreen(int lines, int columns);
+//void moveCursor(int relative_line, unsigned int column);
+int sendFile(int socket);
 int getString(std::string& message);
-
-
 
 
 enum RetCode {
@@ -50,5 +52,16 @@ enum RetCode {
 
     MAX_RETURN_RetCode
 };
+
+
+enum DataType {
+    STOP_TRANSFER = -1,
+    NO_DATA = 0,
+    MESSAGE,
+    IMAGE,
+
+    MAX_MESSAGE_TYPE
+};
+
 
 

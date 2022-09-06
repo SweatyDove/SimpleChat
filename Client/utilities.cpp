@@ -5,14 +5,12 @@
 // #### Функция записывает строку в буфер
 int getString(std::string& message)
 {
-    int size {};
     char ch {'\0'};
     //int (*keystroke)(void) = linux_kbhit;
 
     // #### This loop is responsible for getting number
     while (true) {
 
-        size = message.size();
         // Если нажали какую-то клавишу
         if (linux_kbhit()) {
             // Считываем её
@@ -20,7 +18,7 @@ int getString(std::string& message)
 
             // Если ESC - то выход из режима ввода
             if (ch == 27) {
-                for (int ii {0}; ii < message.size(); ++ii) {
+                for (unsigned int ii {0}; ii < message.size(); ++ii) {
                     std::cout << "\b\b\b   \b\b\b";
                 }
                 std::cout << "\b\b\b   \b\b\b" << std::flush;
@@ -60,53 +58,90 @@ int getString(std::string& message)
 
 
 
-
-void clearWorkScreen(int lines, int columns)
+// #### Отправка файла/изображения.
+// ####
+int sendFile(int socket)
 {
-    // ## Clear the work screen
-    for (int ii {0}; ii < lines; ++ii) {
-        for (int jj {0}; jj < columns; ++jj) {
-           std::cout << ' ';
+    std::FILE*  image {nullptr};
+    long        imageSize {0};
+    long        sendSize {0};
+    long        retValue {0};
+    int         bufSize {2048};
+    char        buffer[bufSize] {'\0'};               // Буффер для пакетной отправки изображения
+
+    std::string filePath {};
+
+    while (true) {
+
+        std::cout << "\nEnter path to the image to send (or enter \"exit\" to exit):"
+                  << "\nPath: " << std::flush;
+        std::cin >> filePath;
+        //std::strcpy(buffer, filePath.c_str());
+
+        if (0 == std::strcmp(filePath.c_str(), "exit")) {
+            return 0;
         }
-        std::cout << std::endl;
+
+        //std::cout << "\nTrying to open:" << filePath.c_str();
+        // #### Open file/image
+        image = std::fopen(filePath.c_str(), "rb");
+        if (image == nullptr) {
+            filePath.clear();
+            perror("[ERROR]::[fopen]");
+        }
+        else {
+            break;
+        }
+    }
+    // ## Calculate file size
+    std::fseek(image, 0, SEEK_END);
+    imageSize = std::ftell(image);
+    std::fseek(image, 0, SEEK_SET);
+
+
+    // #### Firstly, send @imageSize to the server
+    retValue = send(socket, (void*) &imageSize, sizeof(long), 0);
+    if (retValue < 0) {
+        std::perror("[WARNING]::[send]");
+    }
+    else {}
+
+    // #### Copy the image in pieces (2048 byte-pieces) in the buffer and send
+    while (!std::feof(image)) {
+        retValue = std::fread((void*) buffer, 1, bufSize, image);
+        if (retValue < 0) {
+            std::perror("[ERROR]::[fread]");
+            return -1;
+        }
+        else {
+            retValue = send(socket, (void*) buffer, retValue, 0);
+            if (retValue < 0) {
+                std::perror("[ERROR]::[send]");
+                return -1;
+            }
+            else {
+                sendSize += retValue;
+            } // Nothing to do
+        }
+
+//        for (int ii {0}; ii < bufSize; ++ii) {
+//            buffer[ii] = '\0';
+//        }
+    }
+    std::cout << "\nImage original size: " << imageSize << " bytes."
+              << "\nYou send:            " << sendSize << " bytes."
+              << std::endl;
+
+    if (sendSize == imageSize) {
+        std::cout << "\nFile " << filePath << " has been successfully sent!" << std::endl;
+    }
+    else {
+        std::cout << "Can't completely sent file " << filePath << '.' << std::endl;
     }
 
-    // ## Return cursor to the start position
-    for (int ii {0}; ii < lines; ++ii) {
-        std::cout << MOVE_CURSOR_ONE_LINE_UP;
-    }
 
-    return;
+
+    return 0;
+
 }
-
-// Move cursor in the specified position (@@relative_line > 0, then move forward; @@relative_line < 0 - move backward; @@relative_line == 0 - stay at the same line)
-void moveCursor(int relative_line, unsigned int column)
-{
-    //int mask = 0;
-    //unsigned char* forward  = "\n";                                     // New line
-    //unsigned char* backward = "\033[F";                                 // Previous line
-    const char* shift    = nullptr;                                  // Set the direction of the cursor movement
-
-    shift = (relative_line > 0) ? NEW_LINE : MOVE_CURSOR_ONE_LINE_UP;
-    //mask = relative_line >> 31;
-    //relative_line = (relative_line + mask) ^ mask;				// Take modulo (if <int> has 32 bits!)
-
-    relative_line = (relative_line >= 0) ? relative_line : -relative_line;       // Take modulo
-
-    // Set line position
-    while (relative_line-- > 0) {
-        std::cout << shift;
-    }
-
-    // Set column position
-    std::cout.put('\r');
-    while (column-- > 0) {
-        std::cout.put(' ');
-    }
-
-    return;
-}
-
-
-
 

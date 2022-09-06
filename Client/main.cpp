@@ -1,41 +1,26 @@
 #include "header.h"
 
-#define     END_OF_MESSAGE          "END_OF_MESSAGE"
-#define     END_OF_IMAGE            "END_OF_IMAGE"
-#define     END_OF_TRANSMISSION     "END_OF_TRANSMISSION"
 
 //#define portNumber 8080
 //#define targetIP "127.0.0.1"               // Сетевой адрес самой машины
 //#define     FILE_NAME               "/home/alexey/Desktop/image.jpeg"
-//#define     FILE_NAME               /home/alexey/Desktop/Other/blah.jpeg
+//#define     FILE_NAME
+
 //#define     FILE_NAME               /home/alexey/Desktop/Other/unnamed.jpg
 
 
-#define     mcrIsDigit(ch)          (ch >= '0' && ch <= '9')
 
-int sendFile(int socket);
-
-enum DataType {
-    STOP_TRANSFER = -1,
-    NO_DATA = 0,
-    MESSAGE,
-    IMAGE,
-
-    MAX_MESSAGE_TYPE
-};
-
-
-int main(int argc, const char* argv[])
 //int main()
+int main(int argc, const char* argv[])
 {
     int         targetPort {0};
     const char* targetIP {nullptr};
 
-//    int argc = 3;
-//    const char* argv[4] = {"Client", "127.0.0.1", "8080", ""};
+    //int argc = 3;
+    //const char* argv[4] = {"Client", "127.0.0.1", "8080", ""};
 
 
-    char c {'\0'};
+    char ch {'\0'};
 
     if (argc != 3) {
         std::cout << "\nUsage: Client  IPv4  Port" << std::endl;
@@ -44,9 +29,9 @@ int main(int argc, const char* argv[])
     else {
         targetIP = argv[1];
         while (true) {
-            c = *argv[2];
-            if (mcrIsDigit(c)) {
-                targetPort = targetPort * 10 + (c - '0');
+            ch = *argv[2];
+            if (mcrIsDigit(ch)) {
+                targetPort = targetPort * 10 + (ch - '0');
                 ++argv[2];
             }
             else {
@@ -55,8 +40,8 @@ int main(int argc, const char* argv[])
         }
     }
 
-    std::cout << "\ntargetIP:   " << targetIP
-              << "\ntargetPort: " << targetPort
+    std::cout << "\nTarget IPv4: " << targetIP
+              << "\nTarget Port: " << targetPort
               << std::endl;
     int retValue {0};
 
@@ -118,11 +103,10 @@ int main(int argc, const char* argv[])
     // #### Отправляем сообщение через клиентский сокет. Последний аргумент функции равен
     // #### нулю, что означает запись в сокет в порядке поступления байтов.
     // ####
-    bool taskLoop {true};
-    char ch {'\0'};
     std::string message {};
-    int dataType {0};
+    int         dataType {0};
 
+    bool taskLoop {true};
     while (taskLoop) {
         std::cout << "\nWhat are you going to do? (Enter an appropriate button)."
                   << "\n [1]   - Send message"
@@ -133,6 +117,7 @@ int main(int argc, const char* argv[])
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
         switch(ch) {
+
         // #### Отправка сообщения
         // ####
         case '1':
@@ -148,6 +133,7 @@ int main(int argc, const char* argv[])
             linuxTerminalMode(!CANONICAL);
             while(true) {
                 std::cout << ">" << std::flush;
+
                 // Если сообщение - отправляем сообщение
                 if (0 == getString(message)) {
                     retValue = send(clientSocket, message.c_str(), message.size(), 0);
@@ -165,6 +151,7 @@ int main(int argc, const char* argv[])
             }
             linuxTerminalMode(CANONICAL);
             break;
+
         // #### Отправка изображения
         // ####
         case '2':
@@ -178,6 +165,7 @@ int main(int argc, const char* argv[])
             sendFile(clientSocket);
 
             break;
+
         // #### Выход
         // ####
         case 'Q': case 'q':
@@ -197,140 +185,3 @@ int main(int argc, const char* argv[])
     shutdown(clientSocket, SHUT_RDWR);
     return 0;
 }
-
-
-
-
-
-
-
-// #### Отправка файла/изображения.
-int sendFile(int socket)
-{
-    std::FILE*  image {nullptr};
-    long        imageSize {0};
-    long        sendSize {0};
-    long        retValue {0};
-    int         bufSize {2048};
-    char        buffer[bufSize] {'\0'};               // Буффер для пакетной отправки изображения
-
-    std::string filePath {};
-
-    while (true) {
-
-        std::cout << "\nEnter path to the image to send (or enter \"exit\" to exit):"
-                  << "\nPath: " << std::flush;
-        std::cin >> filePath;
-        //std::strcpy(buffer, filePath.c_str());
-
-        if (0 == std::strcmp(filePath.c_str(), "exit")) {
-            return 0;
-        }
-
-        //std::cout << "\nTrying to open:" << filePath.c_str();
-        // #### Open file/image
-        image = std::fopen(filePath.c_str(), "rb");
-        if (image == nullptr) {
-            filePath.clear();
-            perror("[ERROR]::[fopen]");
-        }
-        else {
-            break;
-        }
-    }
-    // ## Calculate file size
-    std::fseek(image, 0, SEEK_END);
-    imageSize = std::ftell(image);
-    std::fseek(image, 0, SEEK_SET);
-
-
-    // #### Firstly, send @imageSize to the server
-    retValue = send(socket, (void*) &imageSize, sizeof(long), 0);
-    if (retValue < 0) {
-        std::perror("[WARNING]::[send]");
-    }
-    else {}
-
-    // #### Copy the image in pieces (2048 byte-pieces) in the buffer and send
-    while (!std::feof(image)) {
-        retValue = std::fread((void*) buffer, 1, bufSize, image);
-        if (retValue < 0) {
-            std::perror("[ERROR]::[fread]");
-            return -1;
-        }
-        else {
-            retValue = send(socket, (void*) buffer, retValue, 0);
-            if (retValue < 0) {
-                std::perror("[ERROR]::[send]");
-                return -1;
-            }
-            else {
-                sendSize += retValue;
-            } // Nothing to do
-        }
-
-//        for (int ii {0}; ii < bufSize; ++ii) {
-//            buffer[ii] = '\0';
-//        }
-    }
-    std::cout << "\nImage original size: " << imageSize << " bytes."
-              << "\nYou send:            " << sendSize << " bytes."
-              << std::endl;
-
-    if (sendSize == imageSize) {
-        std::cout << "\nFile " << filePath << " has been successfully sent!" << std::endl;
-    }
-    else {
-        std::cout << "Can't completely sent file " << filePath << '.' << std::endl;
-    }
-
-
-
-    return 0;
-
-}
-
-
-/*
-}
-else if (retValue < imageSize) {
-    std::cerr << "\n[WARNING]::[fread]: read to buffer: " << retValue << " bytes,"
-              << "\n                    but image size: " << imageSize << " bytes."
-              << std::endl;
-}
-else {
-    std::cout << "\nSuccessfully copy image in the buffer!" << std::endl;
-}
-
-*/
-
-
-
-
-
-
-// #### Отправляем сообщение через клиентский сокет. Последний аргумент функции равен
-// #### нулю, что означает запись в сокет в порядке поступления байтов.
-// ####
-//    retValue = send(clientSocket, strFromClient, strlen(strFromClient), 0);
-//    if (retValue < 0) {
-//        std::perror("[WARNING]::[send]");
-//    }
-//    else {
-//        std::cout << "\nNext message send to server: ";
-//        for (int ii {0}; ii < retValue; ++ii) {
-//            std::cout.put(strFromClient[ii]);
-//        }
-//        std::cout << std::endl;
-//    }
-
-//    // Считываем сообщение от сервера
-//    retValue = read(clientSocket, buffer, 1024);
-//    if (retValue != -1) {
-//        std::cout << "\nGot server response: ";
-//        std::cout.write(buffer, retValue);
-//        std::cout << std::endl;
-//    }
-//    else {
-//        std::perror("[WARNING]::[read]");
-//    }
