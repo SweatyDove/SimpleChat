@@ -8,6 +8,7 @@
 #include <string>
 #include <limits>
 #include <thread>
+#include <cctype>
 
 
 
@@ -36,8 +37,6 @@ int getString(std::string& message);
 
 
 
-#define PORT_NUMBER 8080
-#define TARGET_IP "127.0.0.1"               // Сетевой адрес самой машины
 
 enum RetCode {
     NO_ERROR,

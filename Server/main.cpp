@@ -1,63 +1,42 @@
 
+#include "header.h"
 
-// Comments:
-//
-// #1 Добавить несколько потоков-клиентов, чтобы можно было получать сообщения сразу от нескольких чловек
-
+#define     mcrIsDigit(ch)          (ch >= '0' && ch <= '9')
 
 
-
-
-
-#include <iostream>
-#include <sys/socket.h>         // For: struct sockaddr, socket()
-#include <netinet/in.h>         // For: htons()
-#include <cstdio>               // For: perror()
-#include <cstring>              // For: strlen()
-#include <unistd.h>             // For: close()
-
-#include <thread>
-#include <atomic>
-
-
-#define     macroPaste(front, back)     front ## _ ## back
-
-int receiveImage(std::FILE*, int socket);
-
-const int bufSize {16384};
-char buffer[bufSize];             // Temporary make it global 'cause I don't know the size of input image
-
-#define     FILE_NAME               "/home/alexey/Desktop/new_image.jpeg"
-
-
-#define PORT_NUMBER     8080        // portNum > 1024 && portNum <= 65535
-
-enum Code {
-    NO_ERROR,
-    BAD_SOCKET,
-    BAD_SETSOCKOPT,
-    BAD_BIND,
-    BAD_LISTEN,
-    BAD_ACCEPT,
-
-    MAX_RETURN_CODE
-};
-
-enum Dataype {
-    MESSAGE = 1,
-    IMAGE,
-
-    MAX_MESSAGE_TYPE
-};
-
-std::atomic<bool>   terminalIsFree {true};
-
-int main()
+int main(int argc, const char* argv[])
+//int main()
 {
+//    int argc = 2;
+//    const char* argv[3] = {"Server", "8080", ""};
 
-    //const char* helloString = "Hello from SERVER";
-    int retValue {0};
-    std::FILE* image {nullptr};
+
+    int retValue {0};                       // Variable for the storing different return values
+    std::FILE* image {nullptr};             //
+
+    int portNumber {0};
+
+    char c {'\0'};
+
+    if (argc != 2) {
+        std::cout << "\nUsage:  Server  Port" << std::endl;
+        return 0;
+    }
+    else {
+        // Определяем номер порта
+        while (true) {
+            c = *argv[1];
+            if (mcrIsDigit(c)) {
+                portNumber = portNumber * 10 + (c - '0');
+                ++argv[1];
+            }
+            else {
+                break;
+            }
+        }
+    }
+
+    std::cout << "\nportNumber: " << portNumber << std::endl;
 
 
 
@@ -109,7 +88,7 @@ int main()
     struct sockaddr_in serverSocketAddress;                       //   для локального адреса, для широковещательного адрес и т.п.)
 
     serverSocketAddress.sin_family      = AF_INET;                // Коммуникационный домен AF_INET (адрес = имя хоста + номер порта)
-    serverSocketAddress.sin_port        = htons(PORT_NUMBER);     // Номер порта (переведённый в сетевой порядок следования байтов)
+    serverSocketAddress.sin_port        = htons(portNumber);     // Номер порта (переведённый в сетевой порядок следования байтов)
     serverSocketAddress.sin_addr.s_addr = INADDR_ANY;             // Присваиваем IP-адрес (INADDR_ANY - хотим работать со всеми IP-адресами машины).
                                                                     // Как я понимаю, есть разные адреса (для WiFi, для подключения через Ethernet,
                                                                     //   для локального адреса, для широковещательного адрес и т.п.)
@@ -130,7 +109,7 @@ int main()
     // #### входящие соединения, использующие ф-цию accept().
     // #### [socketMaxQueue] - максимальная длина очереди из желающих присоединиться к сокету.
     // ####
-    int socketMaxQueue {1};
+    int socketMaxQueue {2};
     retValue = listen(serverSocketPart, socketMaxQueue);
     if (retValue < 0) {
         std::perror("[ERROR]::[listen]");
@@ -147,52 +126,59 @@ int main()
         std::perror("[ERROR]::[accept]");
         return Code::BAD_ACCEPT;
     }
-    int dataType {0};
-    retValue = read(socket_1, &dataType, sizeof(int));
-    if (retValue < 0) {
-         std::perror("[WARNING]::[read]");
-    }
     else {
-        switch (dataType) {
-        case MESSAGE:
-            // ReciveMessage
-            break;
-        // Случай приема файла/изображения
-        case IMAGE:
-            receiveImage(image, socket_1);
-            break;
-        default:
-            std::cout << "\n[WARNING]: incorrect type of input data" << std::endl;
-        }
+        std::cout << "\nConnection established!" << std::endl;
     }
-    // Случай приёма сообщений
-    /*
-    else {
-        int attempt {0};
-        const int maxAttempt {10};
-        const int bufSize {2048};
-        char buffer[bufSize] = {'\0'};
 
-        while (attempt < maxAttempt) {
-            retValue = read(socket_1, buffer, bufSize);
-            // Если есть сообщение - выводим
-            if (retValue > 0) {
-                std::cout << "CLIENT_1: ";
-                std::cout.write(buffer, retValue);
-                std::cout << "\n";
-                attempt = 0;
-            }
-            else if (retValue == 0) {
-                // Если нет - увеличиваем счётчик попыток
-                attempt++;
-            }
-            else {
-                std::perror("[WARNING]::[read]");
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    // #### Определяем тип получаемых данных
+    int dataType {0};
+    int attempt {0};
+    int maxAttempt {10};
+
+    bool inLoop {true};
+    while (inLoop) {
+        retValue = read(socket_1, &dataType, sizeof(int));
+        if (retValue < 0) {
+             std::perror("[WARNING]::[read]");
         }
-    }
-    */
+        else {
+            switch (dataType) {
+            case STOP_TRANSFER:
+                std::cout << "\nConnection closed due to the STOP_TRANSFER signal from the client." << std::endl;
+                inLoop = false;
+                break;
+            case NO_DATA:
+                std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                attempt++;
+                if (attempt == maxAttempt) {
+                    inLoop = false;
+                }
+                else {}
+                break;
+            case MESSAGE:
+                receiveMessage(socket_1);
+                dataType = NO_DATA;
+                break;
+            case IMAGE:
+                receiveImage(image, socket_1);
+                dataType = NO_DATA;
+                break;
+            default:
+                std::cout << "\n[WARNING]: incorrect type of input data: " << dataType << "."
+                          << std::endl;
+                if (attempt < maxAttempt) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+                    attempt++;
+                }
+                else {
+                    std::cout << "\nConnection closed due to the inability to receive correct data-type-signal from client";
+                    inLoop = false;
+                }
+                break;
+            } // End of switch()
+        } // End of if-else()
+    } // End of while()
+
 
     // #### Закрываем соединение с клиентом
     close(socket_1);
@@ -204,16 +190,84 @@ int main()
 }
 
 
+// #### Функция обрабатывает случай получения сообщения (набора сообщений) от клиента
+// #### Возвращает кол-во символов, отправленных клиентом
+int receiveMessage(int socket)
+{
+        int attempt {0};
+        const int maxAttempt {10};
+        const int bufSize {1024};
+        char buffer[bufSize] = {'\0'};
+        int retValue {0};
+
+        bool inLoop {true};
+
+        while (inLoop) {
+            retValue = read(socket, buffer, bufSize);
+            // Если есть сообщение - выводим
+            if (retValue > 0) {
+
+                if (0 == std::strcmp(buffer, END_OF_MESSAGE)) {
+                    std::cout << "\nCLIENT_1: [END_OF_MESSAGE]" << std::endl;
+                    return 0;
+                }
+                else {} // Nothing to do
+
+
+                std::cout << "CLIENT_1: ";
+                std::cout.write(buffer, retValue);
+                std::cout << "\n";
+
+                // Очищаем буфер для нового сообщения
+                for (int ii {0}; ii < retValue; ++ii) {
+                    buffer[ii] = '\0';
+                }
+                attempt = 0;
+            }
+            // Если нет - увеличиваем счётчик попыток
+            // (Обдумать ситуацию, когда read() возвращает 0 в случае работы с сокетом)
+            else if (retValue == 0) {
+                inLoop = false;
+                attempt++;
+                std::cout <<"\n attempt " << attempt;
+                if (attempt >= maxAttempt) {
+                    inLoop = false;
+                }
+                else {} // Nothing to do
+            }
+            // Ошибка чтения сообщения - выходим.
+            else {
+                std::perror("[WARNING]::[read]");
+                inLoop = false;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+
+
+        return -1;
+}
+
+
+
+// #### Функция обрабатывает случай получения сервером картинки от клиента
+// ####
 int receiveImage(std::FILE* image, int socket)
 {
     long imageSize {};
     long retValue {0};
     int receiveSize {0};
+    const int bufSize {1024};
+    char buffer[bufSize] = {'\0'};
 
     // #### Get the size of image
     do {
         retValue = read(socket, &imageSize, sizeof(long));
     } while (retValue < 0);
+
+    if (retValue == 0) {
+        std::cout << "\nDidn't get any images.";
+        return 0;
+    }
 
     image = std::fopen(FILE_NAME, "wr");
     if (image == nullptr) {
@@ -256,7 +310,7 @@ int receiveImage(std::FILE* image, int socket)
                 return -1;
             }
             else {
-                // Пишем в файл изображения данные из буфера
+                // Пишем в файл изображения данные из буфера (в кол-ве retValue)
                 std::fwrite(buffer, 1, retValue, image);
                 receiveSize += retValue;
             }
