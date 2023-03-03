@@ -112,7 +112,7 @@ void TCPSocket::bindWithAddress()
 
     mb_serverSocketAddr.sin_family      = AF_INET;
     mb_serverSocketAddr.sin_port        = htons(mb_port);
-    mb_serverSocketAddr.sin_addr.s_addr = mb_ip;
+    mb_serverSocketAddr.sin_addr.s_addr = INADDR_ANY;
 
     mb_serverSocketAddrSize = sizeof(mb_serverSocketAddr);
 
@@ -172,10 +172,10 @@ int TCPSocket::acceptPendingConnection()
         }
     }
 
-//    currentConnection->FD = accept(mb_serverSocketFD,
-//                                   currentConnection->clientAddr,
-//                                   pointer_cast<socklen_t*>(&(currentConnection->clientAddrSize)));
-    currentConnection->FD = accept(mb_serverSocketFD, NULL, NULL);
+    currentConnection->FD = accept(mb_serverSocketFD,
+                                   currentConnection->clientAddr,
+                                   pointer_cast<socklen_t*>(&(currentConnection->clientAddrSize)));
+   // currentConnection->FD = accept(mb_serverSocketFD, NULL, NULL);
     if (currentConnection->FD < 0) {
         std::perror("\n[ERROR]");
         return 0;
