@@ -1,8 +1,8 @@
 #include "header.h"
 
 
-//#define portNumber 8080
-//#define targetIP "127.0.0.1"               // Сетевой адрес самой машины
+//#define     portNumber 8080
+//#define     targetIP "127.0.0.1"         // Сетевой адрес самой машины
 //#define     FILE_NAME               "/home/alexey/Desktop/image.jpeg"
 //#define     FILE_NAME
 
@@ -10,18 +10,32 @@
 
 
 
-//int main()
-int main(int argc, const char* argv[])
+
+
+
+
+
+//int main(int argc, const char* argv[])
+int main()
 {
     int         targetPort {0};
     const char* targetIP {nullptr};
 
-    //int argc = 3;
-    //const char* argv[4] = {"Client", "127.0.0.1", "8080", ""};
+    int argc = 3;
+    const char* argv[4] = {"Client", "127.0.0.1", "8888", ""};
 
 
     char ch {'\0'};
 
+    // #### Case, where the user entered only the program's name
+    if (argc == 1)
+    {
+        std::cout << "Enter the target's \"IPv4\" and \"Port\"."
+                  << std::endl;
+        std::cout << "IPv4: " << getIPv4();
+
+
+    }
     if (argc != 3) {
         std::cout << "\nUsage: Client  IPv4  Port" << std::endl;
         return 0;

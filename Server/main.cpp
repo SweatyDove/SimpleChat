@@ -88,7 +88,7 @@ int main(int argc, const char* argv[])
     serverSocketAddress.sin_family      = AF_INET;                // Коммуникационный домен AF_INET (адрес = имя хоста + номер порта)
     serverSocketAddress.sin_port        = htons(portNumber);     // Номер порта (переведённый в сетевой порядок следования байтов)
     serverSocketAddress.sin_addr.s_addr = INADDR_ANY;             // Присваиваем IP-адрес (INADDR_ANY - хотим работать со всеми IP-адресами машины).
-                                                                    // Как я понимаю, есть разные адреса (для WiFi, для подключения через Ethernet,
+                                                                    // Как я понимаю, есть разные адреса  (для WiFi, для подключения через Ethernet,
                                                                     //   для локального адреса, для широковещательного адрес и т.п.)
     int serverSocketAddressLen {sizeof(serverSocketAddress)};
 
