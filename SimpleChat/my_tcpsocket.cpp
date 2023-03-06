@@ -175,6 +175,14 @@ int TCPSocket::acceptPendingConnection()
     currentConnection->FD = accept(mb_serverSocketFD,
                                    currentConnection->clientAddr,
                                    pointer_cast<socklen_t*>(&(currentConnection->clientAddrSize)));
+
+    struct sockaddr_in* pV4Addr = pointer_cast<sockaddr_in*>(currentConnection->clientAddr);
+    struct in_addr ipAddr = pV4Addr->sin_addr;
+    char str[INET_ADDRSTRLEN] {'\0'};
+    inet_ntop(AF_INET, &ipAddr, str, INET_ADDRSTRLEN);
+
+
+
    // currentConnection->FD = accept(mb_serverSocketFD, NULL, NULL);
     if (currentConnection->FD < 0) {
         std::perror("\n[ERROR]");
